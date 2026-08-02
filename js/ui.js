@@ -1,6 +1,7 @@
 import { timeStr, dateStr } from './db.js';
 import { DISCLAIMER } from './config.js';
 import { getSaleCatInfo } from './drugdb.js';
+import { formatDuration, formatDistance } from './toolhub.js';
 
 const messagesEl = document.getElementById('messages');
 
@@ -110,14 +111,17 @@ export function renderDrugResults(bubble, drugs, onFindPharmacy) {
   bubble.appendChild(wrap);
 
   wrap.querySelectorAll('.find-ph-btn').forEach(btn => {
-    btn.onclick = () => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
       const d = drugs[parseInt(btn.dataset.idx)];
-      if (onFindPharmacy) onFindPharmacy(d);
-    };
+      if (onFindPharmacy) {
+        Promise.resolve(onFindPharmacy(d)).catch(err => console.error('Find pharmacy error:', err));
+      }
+    });
   });
 }
 
-export function renderPharmacyResults(bubble, pharmacies, saleCat) {
+export function renderPharmacyResults(bubble, pharmacies, saleCat, onRoute) {
   if (!pharmacies.length) {
     const card = document.createElement('div');
     card.className = 'card card-pending';
@@ -136,20 +140,94 @@ export function renderPharmacyResults(bubble, pharmacies, saleCat) {
 <div class="card-detail">销售类别: <span class="cat-badge ${catInfo.cls}">${esc(catInfo.short)}</span> ${esc(catInfo.label)}</div>`;
   wrap.appendChild(header);
 
-  pharmacies.forEach(p => {
+  pharmacies.forEach((p, idx) => {
     const card = document.createElement('div');
     card.className = 'card card-pharmacy';
-    const mapQ = encodeURIComponent(p.addr);
     card.innerHTML = `<div class="card-title">${esc(p.nameZh || p.name)}</div>
 ${p.nameZh ? `<div class="card-detail">${esc(p.name)}</div>` : ''}
 <div class="card-detail">&#x1F4CD; ${esc(p.addr)}</div>
 ${p.tel ? `<div class="card-detail">&#x1F4DE; <a href="tel:${esc(p.tel)}" class="ph-link">${esc(p.tel)}</a></div>` : ''}
 <div class="card-detail">&#x1F4CD; ${esc(p.district)}</div>
-<div class="card-actions"><a class="btn-confirm ph-route-btn" href="https://www.google.com/maps/search/?api=1&query=${mapQ}" target="_blank" rel="noopener">&#x1F697; 路线导航</a></div>`;
+<div class="card-actions"><button class="btn-confirm ph-route-btn" data-pidx="${idx}">&#x1F68C; 公交路线</button></div>`;
     wrap.appendChild(card);
   });
 
   bubble.appendChild(wrap);
+
+  if (onRoute) {
+    wrap.querySelectorAll('.ph-route-btn').forEach(btn => {
+      btn.onclick = () => onRoute(pharmacies[parseInt(btn.dataset.pidx)]);
+    });
+  }
+}
+
+export function renderRouteCard(bubble, routeData, pharmacy) {
+  const wrap = document.createElement('div');
+  wrap.className = 'route-results';
+
+  const routes = routeData.results || [];
+  if (!routes.length) {
+    wrap.innerHTML = '<div class="card card-pending"><div class="card-title">&#x1F6A8; 未找到路线</div><div class="card-detail">请稍后再试</div></div>';
+    bubble.appendChild(wrap);
+    return;
+  }
+
+  const ep = routeData.endpoints || {};
+  const originName = ep.origin?.name_tc || ep.origin?.name_en || ep.origin?.input_label || '当前位置';
+
+  routes.slice(0, 2).forEach((r, ri) => {
+    const card = document.createElement('div');
+    card.className = 'card card-route';
+    const fare = r.fare;
+    const fareText = fare && fare.amount > 0 ? `HKD $${fare.amount}` : '免费';
+
+    let stepsHtml = '';
+    const mergedSteps = mergeWalkSteps(r.steps || []);
+    mergedSteps.forEach(s => {
+      const tr = s.transit;
+      if (tr) {
+        const line = tr.line_name_tc || tr.line_name_en || '';
+        const dep = tr.departure_stop?.name_tc || tr.departure_stop?.name_en || tr.departure_stop_tc || '';
+        const arr = tr.arrival_stop?.name_tc || tr.arrival_stop?.name_en || tr.arrival_stop_tc || '';
+        const vehicle = tr.vehicle_type_tc || tr.vehicle_type || '';
+        const stops = tr.num_stops ? `${tr.num_stops}站` : '';
+        stepsHtml += `<div class="route-step transit-step">
+<span class="step-icon">&#x1F68C;</span>
+<div class="step-info"><strong>${esc(vehicle)} ${esc(line)}</strong><div class="step-detail">${esc(dep)} &#x2192; ${esc(arr)} · ${stops} ${formatDuration(s.duration_seconds)}</div></div></div>`;
+      } else {
+        stepsHtml += `<div class="route-step walk-step">
+<span class="step-icon">&#x1F6B6;</span>
+<div class="step-info">步行 ${formatDistance(s.distance_meters)} · ${formatDuration(s.duration_seconds)}</div></div>`;
+      }
+    });
+
+    card.innerHTML = `<div class="card-title">&#x1F5FA; 路线${routes.length > 1 ? ' ' + (ri + 1) : ''}: ${esc(originName)} &#x2192; ${esc(pharmacy?.nameZh || pharmacy?.name || '药房')}</div>
+<div class="route-summary"><span>&#x23F1; ${formatDuration(r.duration_seconds)}</span><span>&#x1F4CF; ${formatDistance(r.distance_meters)}</span><span>&#x1F4B0; ${fareText}</span></div>
+<div class="route-steps">${stepsHtml}</div>`;
+    wrap.appendChild(card);
+  });
+
+  bubble.appendChild(wrap);
+}
+
+function mergeWalkSteps(steps) {
+  const merged = [];
+  let walkAcc = null;
+  for (const s of steps) {
+    if (s.mode === 'walk') {
+      if (walkAcc) {
+        walkAcc.distance_meters += s.distance_meters;
+        walkAcc.duration_seconds += s.duration_seconds;
+      } else {
+        walkAcc = { ...s };
+      }
+    } else {
+      if (walkAcc) { merged.push(walkAcc); walkAcc = null; }
+      merged.push(s);
+    }
+  }
+  if (walkAcc) merged.push(walkAcc);
+  return merged;
 }
 
 export function renderRecordsList(containerEl, events) {

@@ -21,7 +21,7 @@ try {
 } catch {}
 
 const server = http.createServer(async (req, res) => {
-  // Toolhub proxy
+  // Toolhub MCP proxy
   if (req.url === '/api/tools' && req.method === 'POST') {
     let body = '';
     req.on('data', c => body += c);
@@ -32,18 +32,39 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       try {
-        const { tool, params } = JSON.parse(body);
-        const upstream = await fetch(`${env.TOOLHUB_URL || 'https://hkgai-studio.prod.hkchat.app'}/api/tools/${tool}`, {
+        const { tool, args } = JSON.parse(body);
+        const rpcBody = {
+          jsonrpc: '2.0', method: 'tools/call', id: Date.now(),
+          params: { name: tool, arguments: args || {} }
+        };
+        const upstream = await fetch(`${env.TOOLHUB_URL || 'https://toolhub.prod.hkchat.app'}/mcp`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
             'App-Name': env.TOOLHUB_APP_NAME,
             'App-Key': env.TOOLHUB_APP_KEY
           },
-          body: JSON.stringify(params || {})
+          body: JSON.stringify(rpcBody)
         });
-        res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(await upstream.json()));
+        const raw = await upstream.text();
+        let result = null;
+        for (const line of raw.split('\n')) {
+          if (line.startsWith('data: ')) {
+            const parsed = JSON.parse(line.slice(6));
+            if (parsed.result?.structuredContent) result = parsed.result.structuredContent;
+            else if (parsed.result?.content) {
+              try { result = JSON.parse(parsed.result.content[0].text); } catch {}
+            }
+            if (parsed.error) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: parsed.error.message }));
+              return;
+            }
+          }
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result || { error: 'No result' }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));

@@ -1,9 +1,10 @@
 import { API_BASE, SYSTEM_PROMPT, DISCLAIMER } from './config.js';
 import { db, uuid, now, timeStr, dateStr } from './db.js';
-import { appendUserMsg, createBotBubble, addTimeStamp, addSpeakButton, renderHealthCard, renderPendingCard, renderVisitDraftCard, renderVisitBriefCard, renderRecordsList, renderDrugResults, renderPharmacyResults, scrollBottom } from './ui.js';
+import { appendUserMsg, createBotBubble, addTimeStamp, addSpeakButton, renderHealthCard, renderPendingCard, renderVisitDraftCard, renderVisitBriefCard, renderRecordsList, renderDrugResults, renderPharmacyResults, renderRouteCard, scrollBottom } from './ui.js';
 import { initVoices, speak, stopSpeaking, toggleMic } from './voice.js';
 import { initDrugDB, searchDrugs } from './drugdb.js';
 import { initPharmacyDB, searchPharmacies } from './pharmacydb.js';
+import { planRoute, getUserLocation } from './toolhub.js';
 
 // ── State ──
 let conversationHistory = [];
@@ -194,7 +195,50 @@ async function showPharmaciesForDrug(drug, district) {
   const results = searchPharmacies(opts);
 
   content.textContent = '';
-  renderPharmacyResults(bubble, results, drug.s);
+  renderPharmacyResults(bubble, results, drug.s, (pharmacy) => {
+    showTransitRoute(pharmacy);
+  });
+  addTimeStamp(bubble);
+  scrollBottom();
+}
+
+const DISTRICT_ZH = {
+  'MONG KOK':'旺角','TSUEN WAN':'荃灣','SHAM SHUI PO':'深水埗','SHATIN':'沙田',
+  'TUEN MUN':'屯門','YUEN LONG':'元朗','TAI PO':'大埔','KWAI CHUNG':'葵涌',
+  'KWUN TONG':'觀塘','TSEUNG KWAN O':'將軍澳','ABERDEEN':'香港仔','NORTH POINT':'北角',
+  'CAUSEWAY BAY':'銅鑼灣','CENTRAL':'中環','WAN CHAI':'灣仔','SAI YING PUN':'西營盤',
+  'KOWLOON CITY':'九龍城','WONG TAI SIN':'黃大仙','NGAU TAU KOK':'牛頭角',
+  'SHEUNG SHUI':'上水','FANLING':'粉嶺','TSIM SHA TSUI':'尖沙咀','JORDAN':'佐敦',
+  'TO KWA WAN':'土瓜灣','CHAI WAN':'柴灣','SHEK TONG TSUI':'石塘咀',
+  'LAM TIN':'藍田','SAU MAU PING':'秀茂坪','TAI WAI':'大圍','MA ON SHAN':'馬鞍山',
+  'TUNG CHUNG':'東涌','TIN SHUI WAI':'天水圍','HUNG HOM':'紅磡','CHEUNG SHA WAN':'長沙灣',
+};
+
+function cleanAddr(addr) {
+  return addr.replace(/^(SHOP\s+\S+,?\s*|FLAT\s+\S+,?\s*|UNIT\s+\S+,?\s*|PORTION\s+OF\s+\S+,?\s*)*\s*(G\/F|GROUND\s+FLOOR|\d+\/F|\d+ST\s+FLOOR|\d+ND\s+FLOOR|\d+RD\s+FLOOR|\d+TH\s+FLOOR)\s*,?\s*/i, '')
+    .replace(/,\s*(HK|KLN|NT)\s*$/i, '')
+    .trim();
+}
+
+async function showTransitRoute(pharmacy) {
+  const { bubble, content } = createBotBubble();
+  content.textContent = '正在获取位置并规划公交路线...';
+  scrollBottom();
+
+  try {
+    let origin;
+    try {
+      origin = await getUserLocation();
+    } catch {
+      origin = DISTRICT_ZH[pharmacy.district] || pharmacy.district.replace(/\s+/g, ' ');
+    }
+    const dest = cleanAddr(pharmacy.addr);
+    const routeData = await planRoute(origin, dest);
+    content.textContent = '';
+    renderRouteCard(bubble, routeData, pharmacy);
+  } catch (err) {
+    content.textContent = `路线查询失败: ${err.message}`;
+  }
   addTimeStamp(bubble);
   scrollBottom();
 }
