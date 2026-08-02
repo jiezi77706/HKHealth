@@ -21,7 +21,38 @@ try {
 } catch {}
 
 const server = http.createServer(async (req, res) => {
-  // API proxy
+  // Toolhub proxy
+  if (req.url === '/api/tools' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      if (!env.TOOLHUB_APP_NAME || !env.TOOLHUB_APP_KEY) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Toolhub credentials not configured' }));
+        return;
+      }
+      try {
+        const { tool, params } = JSON.parse(body);
+        const upstream = await fetch(`${env.TOOLHUB_URL || 'https://hkgai-studio.prod.hkchat.app'}/api/tools/${tool}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'App-Name': env.TOOLHUB_APP_NAME,
+            'App-Key': env.TOOLHUB_APP_KEY
+          },
+          body: JSON.stringify(params || {})
+        });
+        res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(await upstream.json()));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Chat API proxy
   if (req.url === '/api/chat' && req.method === 'POST') {
     let body = '';
     req.on('data', c => body += c);

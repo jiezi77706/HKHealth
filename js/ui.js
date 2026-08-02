@@ -1,5 +1,6 @@
 import { timeStr, dateStr } from './db.js';
 import { DISCLAIMER } from './config.js';
+import { getSaleCatInfo } from './drugdb.js';
 
 const messagesEl = document.getElementById('messages');
 
@@ -81,6 +82,74 @@ export function renderVisitBriefCard(bubble, brief) {
 <div class="brief-content">${esc(brief.content)}</div>
 <div class="brief-disclaimer">&#x26A0;&#xFE0F; ${DISCLAIMER}</div>`;
   bubble.appendChild(card);
+}
+
+export function renderDrugResults(bubble, drugs, onFindPharmacy) {
+  if (!drugs.length) {
+    const card = document.createElement('div');
+    card.className = 'card card-pending';
+    card.innerHTML = '<div class="card-title">&#x1F50D; 未找到匹配药品</div><div class="card-detail">请尝试用英文药名或成分名搜索</div>';
+    bubble.appendChild(card);
+    return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'drug-results';
+
+  drugs.forEach((d, idx) => {
+    const cat = getSaleCatInfo(d.s);
+    const card = document.createElement('div');
+    card.className = 'card card-drug';
+    card.innerHTML = `<div class="card-title"><span class="cat-badge ${cat.cls}">${esc(cat.short)}</span> ${esc(d.n)}</div>
+<div class="card-detail">${esc(d.p)} · ${esc(d.i.join(', '))}</div>
+<div class="card-concept">${esc(cat.tip)}</div>
+<div class="card-actions"><button class="btn-confirm find-ph-btn" data-idx="${idx}">&#x1F3E5; 查找药房</button></div>`;
+    wrap.appendChild(card);
+  });
+
+  bubble.appendChild(wrap);
+
+  wrap.querySelectorAll('.find-ph-btn').forEach(btn => {
+    btn.onclick = () => {
+      const d = drugs[parseInt(btn.dataset.idx)];
+      if (onFindPharmacy) onFindPharmacy(d);
+    };
+  });
+}
+
+export function renderPharmacyResults(bubble, pharmacies, saleCat) {
+  if (!pharmacies.length) {
+    const card = document.createElement('div');
+    card.className = 'card card-pending';
+    card.innerHTML = '<div class="card-title">&#x1F3E5; 未找到附近药房</div><div class="card-detail">请尝试其他地区</div>';
+    bubble.appendChild(card);
+    return;
+  }
+
+  const catInfo = getSaleCatInfo(saleCat || 'OTC');
+  const wrap = document.createElement('div');
+  wrap.className = 'pharmacy-results';
+
+  const header = document.createElement('div');
+  header.className = 'card card-visit';
+  header.innerHTML = `<div class="card-title">&#x1F3E5; 附近注册药房 (${pharmacies.length}间)</div>
+<div class="card-detail">销售类别: <span class="cat-badge ${catInfo.cls}">${esc(catInfo.short)}</span> ${esc(catInfo.label)}</div>`;
+  wrap.appendChild(header);
+
+  pharmacies.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'card card-pharmacy';
+    const mapQ = encodeURIComponent(p.addr);
+    card.innerHTML = `<div class="card-title">${esc(p.nameZh || p.name)}</div>
+${p.nameZh ? `<div class="card-detail">${esc(p.name)}</div>` : ''}
+<div class="card-detail">&#x1F4CD; ${esc(p.addr)}</div>
+${p.tel ? `<div class="card-detail">&#x1F4DE; <a href="tel:${esc(p.tel)}" class="ph-link">${esc(p.tel)}</a></div>` : ''}
+<div class="card-detail">&#x1F4CD; ${esc(p.district)}</div>
+<div class="card-actions"><a class="btn-confirm ph-route-btn" href="https://www.google.com/maps/search/?api=1&query=${mapQ}" target="_blank" rel="noopener">&#x1F697; 路线导航</a></div>`;
+    wrap.appendChild(card);
+  });
+
+  bubble.appendChild(wrap);
 }
 
 export function renderRecordsList(containerEl, events) {

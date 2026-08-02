@@ -1,7 +1,9 @@
 import { API_BASE, SYSTEM_PROMPT, DISCLAIMER } from './config.js';
 import { db, uuid, now, timeStr, dateStr } from './db.js';
-import { appendUserMsg, createBotBubble, addTimeStamp, addSpeakButton, renderHealthCard, renderPendingCard, renderVisitDraftCard, renderVisitBriefCard, renderRecordsList, scrollBottom } from './ui.js';
+import { appendUserMsg, createBotBubble, addTimeStamp, addSpeakButton, renderHealthCard, renderPendingCard, renderVisitDraftCard, renderVisitBriefCard, renderRecordsList, renderDrugResults, renderPharmacyResults, scrollBottom } from './ui.js';
 import { initVoices, speak, stopSpeaking, toggleMic } from './voice.js';
+import { initDrugDB, searchDrugs } from './drugdb.js';
+import { initPharmacyDB, searchPharmacies } from './pharmacydb.js';
 
 // ── State ──
 let conversationHistory = [];
@@ -17,6 +19,8 @@ const typingEl = document.getElementById('typing');
 // ── Init ──
 speechSynthesis.onvoiceschanged = initVoices;
 initVoices();
+initDrugDB();
+initPharmacyDB();
 
 inputEl.addEventListener('input', () => {
   inputEl.style.height = 'auto';
@@ -96,6 +100,8 @@ function handleMeta(meta, bubble) {
         renderPendingCard(bubble);
       }
     }
+  } else if (meta.intent === 'drug_search' && meta.drug) {
+    handleDrugSearch(meta.drug, bubble);
   } else if (meta.intent !== 'health_report' && pendingFollowup) {
     const pf = pendingFollowup;
     db.saveEvent({
@@ -153,6 +159,44 @@ ${recordsSummary || '(无记录)'}
     addTimeStamp(bubble);
   }
   visitPrepState = null;
+}
+
+// ── Drug search ──
+async function handleDrugSearch(drugMeta, bubble) {
+  await initDrugDB();
+  await initPharmacyDB();
+
+  const query = drugMeta.q || '';
+  const queries = query.split(/\s+OR\s+/i).map(q => q.trim()).filter(Boolean);
+
+  let allResults = [];
+  const seen = new Set();
+  for (const q of queries) {
+    for (const d of searchDrugs(q, 6)) {
+      if (!seen.has(d.p)) { seen.add(d.p); allResults.push(d); }
+    }
+  }
+  allResults = allResults.slice(0, 8);
+
+  renderDrugResults(bubble, allResults, (drug) => {
+    showPharmaciesForDrug(drug, drugMeta.district);
+  });
+  scrollBottom();
+}
+
+async function showPharmaciesForDrug(drug, district) {
+  await initPharmacyDB();
+  const { bubble, content } = createBotBubble();
+  content.textContent = `正在查找可购买 ${drug.n} 的药房...`;
+
+  const opts = { limit: 8 };
+  if (district) opts.district = district;
+  const results = searchPharmacies(opts);
+
+  content.textContent = '';
+  renderPharmacyResults(bubble, results, drug.s);
+  addTimeStamp(bubble);
+  scrollBottom();
 }
 
 // ── Main send ──
