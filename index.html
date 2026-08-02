@@ -65,7 +65,40 @@
 
   <!-- Chat -->
   <div class="messages" id="messages">
-    <div class="welcome">Say anything — I'll understand if it's a symptom, a question, or visit preparation.</div>
+    <div class="welcome">
+      <div class="welcome-greeting">哈囉，想傾下今日身體點呀？</div>
+      <div class="welcome-prompts">
+        <button class="prompt-chip" data-msg="今日邊度唔舒服呀？">
+          <span class="prompt-label">咩事呀</span>
+          <span class="prompt-text">今日邊度唔舒服呀？</span>
+        </button>
+        <button class="prompt-chip" data-msg="係突然出現定慢慢嚟㗎？">
+          <span class="prompt-label">幾時開始</span>
+          <span class="prompt-text">係突然嚟定慢慢出現？</span>
+        </button>
+        <button class="prompt-chip" data-msg="可唔可以形容下係咩感覺？">
+          <span class="prompt-label">咩感覺</span>
+          <span class="prompt-text">可唔可以形容下？</span>
+        </button>
+        <button class="prompt-chip" data-msg="有冇影響到瞓覺、返工或者食嘢？">
+          <span class="prompt-label">影響咗咩</span>
+          <span class="prompt-text">瞓覺、返工、食嘢有冇影響？</span>
+        </button>
+        <button class="prompt-chip" data-msg="最近有冇捱夜、飲食變化、壓力大或者其他變化？">
+          <span class="prompt-label">可能關咩事</span>
+          <span class="prompt-text">捱夜、飲食變化、壓力大？</span>
+        </button>
+        <button class="prompt-chip" data-msg="自己做咗啲咩？有冇好轉？">
+          <span class="prompt-label">之後點</span>
+          <span class="prompt-text">做咗啲咩？有冇好轉？</span>
+        </button>
+      </div>
+      <div class="welcome-actions">
+        <button class="action-chip" data-msg="我想查下藥品信息">&#x1F48A; 查藥品藥房</button>
+        <button class="action-chip" onclick="togglePanel('records')">&#x1F4CB; 身體記錄</button>
+        <button class="action-chip" data-msg="我想準備覆診資料">&#x1F5C2; 問診摘要</button>
+      </div>
+    </div>
   </div>
   <div class="typing-indicator" id="typing"><span></span><span></span><span></span></div>
 

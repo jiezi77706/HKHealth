@@ -49,6 +49,13 @@ window.toggleAutoTts = function() {
 
 window.sendMessage = sendMessage;
 
+document.querySelectorAll('.prompt-chip[data-msg], .action-chip[data-msg]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    inputEl.value = btn.dataset.msg;
+    sendMessage();
+  });
+});
+
 window.toggleMicBtn = function() {
   toggleMic((text) => {
     inputEl.value = text;
@@ -324,21 +331,25 @@ async function sendMessage() {
     if (meta?.intent === 'visit_prep' && !visitPrepState) {
       visitPrepState = { topic: null };
     } else if (visitPrepState && !visitPrepState.topic) {
-      visitPrepState.topic = text;
-      const events = db.getEvents();
-      const topicLower = text.toLowerCase();
-      const related = events.filter(e =>
-        (e.original_text?.toLowerCase().includes(topicLower)) ||
-        (e.standard_concept?.toLowerCase().includes(topicLower)) ||
-        (e.structured?.what?.toLowerCase().includes(topicLower))
-      );
-      const selected = related.length ? related : events.slice(0, 5);
-      const draftId = uuid();
-      renderVisitDraftCard(bubble, text, selected, draftId,
-        () => confirmVisitBrief(text, selected),
-        () => { visitPrepState = null; const { content: c } = createBotBubble(); c.textContent = '好的，已取消。'; }
-      );
-      visitPrepState = { draftId, topic: text, events: selected };
+      if (meta?.intent && meta.intent !== 'visit_prep' && meta.intent !== 'other' && meta.intent !== 'general_consultation') {
+        visitPrepState = null;
+      } else {
+        visitPrepState.topic = text;
+        const events = db.getEvents();
+        const topicLower = text.toLowerCase();
+        const related = events.filter(e =>
+          (e.original_text?.toLowerCase().includes(topicLower)) ||
+          (e.standard_concept?.toLowerCase().includes(topicLower)) ||
+          (e.structured?.what?.toLowerCase().includes(topicLower))
+        );
+        const selected = related.length ? related : events.slice(0, 5);
+        const draftId = uuid();
+        renderVisitDraftCard(bubble, text, selected, draftId,
+          () => confirmVisitBrief(text, selected),
+          () => { visitPrepState = null; const { content: c } = createBotBubble(); c.textContent = '好的，已取消。'; }
+        );
+        visitPrepState = { draftId, topic: text, events: selected };
+      }
     }
 
     const speakBtn = addSpeakButton(bubble, displayText, speak, stopSpeaking);
