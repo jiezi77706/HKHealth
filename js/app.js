@@ -45,7 +45,10 @@ window.toggleAutoTts = function() {
 window.sendMessage = sendMessage;
 
 window.toggleMicBtn = function() {
-  toggleMic(inputEl, sendMessage);
+  toggleMic((text) => {
+    inputEl.value = text;
+    sendMessage();
+  });
 };
 
 window.startVisitPrep = function() {
