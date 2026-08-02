@@ -1,0 +1,270 @@
+import { API_BASE, SYSTEM_PROMPT, DISCLAIMER } from './config.js';
+import { db, uuid, now, timeStr, dateStr } from './db.js';
+import { appendUserMsg, createBotBubble, addTimeStamp, addSpeakButton, renderHealthCard, renderPendingCard, renderVisitDraftCard, renderVisitBriefCard, renderRecordsList, scrollBottom } from './ui.js';
+import { initVoices, speak, stopSpeaking, toggleMic } from './voice.js';
+
+// ── State ──
+let conversationHistory = [];
+let isStreaming = false;
+let autoTts = false;
+let pendingFollowup = null;
+let visitPrepState = null;
+
+const inputEl = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const typingEl = document.getElementById('typing');
+
+// ── Init ──
+speechSynthesis.onvoiceschanged = initVoices;
+initVoices();
+
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
+});
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+// ── Expose to HTML onclick handlers ──
+window.togglePanel = function(name) {
+  document.querySelectorAll('.panel').forEach(p => {
+    if (p.id === name + 'Panel') p.classList.toggle('active');
+    else p.classList.remove('active');
+  });
+  if (name === 'records') {
+    renderRecordsList(document.getElementById('recordsList'), db.getEvents());
+  }
+};
+
+window.toggleAutoTts = function() {
+  autoTts = !autoTts;
+  document.getElementById('autoTtsToggle').classList.toggle('on', autoTts);
+};
+
+window.sendMessage = sendMessage;
+
+window.toggleMicBtn = function() {
+  toggleMic(inputEl, sendMessage);
+};
+
+window.startVisitPrep = function() {
+  window.togglePanel('records');
+  inputEl.value = '我想准备复诊资料';
+  sendMessage();
+};
+
+// ── Meta parsing ──
+function parseMeta(fullText) {
+  const m = fullText.match(/<m>([\s\S]*?)<\/m>/);
+  if (!m) return { meta: null, display: fullText };
+  let meta = null;
+  try { meta = JSON.parse(m[1]); } catch {}
+  return { meta, display: fullText.replace(/<m>[\s\S]*?<\/m>/, '').trim() };
+}
+
+// ── Intent handler ──
+function handleMeta(meta, bubble) {
+  if (meta.intent === 'health_report' && meta.he) {
+    const he = meta.he;
+    if (he.lv === 'L1') {
+      const event = {
+        id: uuid(), original_text: he.ot || '',
+        structured: { what: he.what, onset: he.onset, character: he.char, impact: he.impact, context: he.ctx, progression: he.prog },
+        standard_concept: he.concept || null,
+        level: 'L1', recorded_at: now(), status: he.status || 'ongoing'
+      };
+      db.saveEvent(event);
+      renderHealthCard(bubble, event);
+      pendingFollowup = null;
+    } else if (he.lv === 'L2') {
+      pendingFollowup = { ...he, followupCount: (pendingFollowup?.followupCount || 0) + 1 };
+      if (pendingFollowup.followupCount >= 2) {
+        const event = {
+          id: uuid(), original_text: he.ot || '',
+          structured: { what: he.what, onset: he.onset, character: he.char, impact: he.impact, context: he.ctx, progression: he.prog },
+          standard_concept: he.concept || null,
+          level: 'L2', recorded_at: now(), status: he.status || 'ongoing'
+        };
+        db.saveEvent(event);
+        renderHealthCard(bubble, event);
+        pendingFollowup = null;
+      } else {
+        renderPendingCard(bubble);
+      }
+    }
+  } else if (meta.intent !== 'health_report' && pendingFollowup) {
+    const pf = pendingFollowup;
+    db.saveEvent({
+      id: uuid(), original_text: pf.ot || '',
+      structured: { what: pf.what, onset: pf.onset, character: pf.char, impact: pf.impact, context: pf.ctx, progression: pf.prog },
+      standard_concept: pf.concept || null,
+      level: 'L2', recorded_at: now(), status: pf.status || 'ongoing'
+    });
+    pendingFollowup = null;
+  }
+}
+
+// ── Visit brief confirm ──
+async function confirmVisitBrief(topic, events) {
+  const recordsSummary = events.map(e => {
+    const s = e.structured || {};
+    return `- ${dateStr(e.recorded_at)}: ${e.original_text} [${e.standard_concept || 'N/A'}] 状态:${e.status} what:${s.what || ''} onset:${s.onset || ''}`;
+  }).join('\n');
+
+  const prompt = `请根据以下信息生成一份简洁的问诊摘要。
+主题: ${topic}
+相关健康记录:
+${recordsSummary || '(无记录)'}
+
+要求: 1.用清晰条目整理症状时间线 2.列出主要症状及变化 3.注明记录时间 4.不要诊断不给医疗建议 5.用中文撰写`;
+
+  try {
+    const resp = await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'system', content: '你是一个医疗记录整理助手。只整理信息，不诊断。' }, { role: 'user', content: prompt }],
+        temperature: 0.3, stream: false
+      })
+    });
+    const data = await resp.json();
+    const briefContent = data.choices?.[0]?.message?.content || '生成失败';
+    const brief = {
+      id: uuid(), topic, related_health_event_ids: events.map(e => e.id),
+      related_medication_ids: [], generated_at: now(), confirmed: true,
+      content: briefContent, disclaimer: DISCLAIMER
+    };
+    db.saveBrief(brief);
+
+    const { bubble, content } = createBotBubble();
+    content.textContent = '问诊摘要已生成:';
+    addTimeStamp(bubble);
+    renderVisitBriefCard(bubble, brief);
+    addSpeakButton(bubble, briefContent, speak, stopSpeaking);
+    scrollBottom();
+    conversationHistory.push({ role: 'assistant', content: '问诊摘要已生成。' });
+  } catch (err) {
+    const { bubble, content } = createBotBubble();
+    content.textContent = `Error: ${err.message}`;
+    addTimeStamp(bubble);
+  }
+  visitPrepState = null;
+}
+
+// ── Main send ──
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text || isStreaming) return;
+  appendUserMsg(text);
+  inputEl.value = ''; inputEl.style.height = 'auto';
+  conversationHistory.push({ role: 'user', content: text });
+
+  isStreaming = true;
+  sendBtn.disabled = true;
+  typingEl.classList.add('active');
+
+  let sysPrompt = SYSTEM_PROMPT;
+  const extraEl = document.getElementById('sysPromptExtra');
+  if (extraEl?.value.trim()) sysPrompt += '\n\n【附加指令】\n' + extraEl.value.trim();
+
+  if (pendingFollowup) {
+    const pf = pendingFollowup;
+    sysPrompt += `\n\n【待跟进记录】
+用户之前说: "${pf.ot}"
+已知: what=${pf.what || '?'}, onset=${pf.onset || '?'}, char=${pf.char || '?'}, impact=${pf.impact || '?'}, ctx=${pf.ctx || '?'}, prog=${pf.prog || '?'}
+缺失字段: ${pf.miss}
+用户现在的消息可能是在回答追问。如果是，合并信息后 lv 改为 L1 记录；如果用户在说别的事，按新消息处理。`;
+  }
+
+  const temperature = parseFloat(document.getElementById('tempInput')?.value) || 0.7;
+  const apiMessages = [{ role: 'system', content: sysPrompt }, ...conversationHistory];
+
+  try {
+    const resp = await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: apiMessages, temperature, stream: true })
+    });
+    if (!resp.ok) throw new Error(`API ${resp.status}: ${await resp.text()}`);
+    typingEl.classList.remove('active');
+
+    const { bubble, content } = createBotBubble();
+    let fullText = '', metaParsed = false, displayText = '';
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n'); buffer = lines.pop();
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t || !t.startsWith('data: ')) continue;
+        const d = t.slice(6);
+        if (d === '[DONE]') continue;
+        try {
+          const delta = JSON.parse(d).choices?.[0]?.delta?.content;
+          if (delta) {
+            fullText += delta;
+            if (!metaParsed && fullText.includes('</m>')) {
+              metaParsed = true;
+            }
+            if (metaParsed) {
+              displayText = fullText.replace(/<m>[\s\S]*?<\/m>/, '').trim();
+              content.textContent = displayText;
+            }
+            scrollBottom();
+          }
+        } catch {}
+      }
+    }
+
+    if (!metaParsed) { displayText = fullText; content.textContent = displayText; }
+    addTimeStamp(bubble);
+
+    const { meta } = parseMeta(fullText);
+    if (meta) handleMeta(meta, bubble);
+
+    // Visit prep flow
+    if (meta?.intent === 'visit_prep' && !visitPrepState) {
+      visitPrepState = { topic: null };
+    } else if (visitPrepState && !visitPrepState.topic) {
+      visitPrepState.topic = text;
+      const events = db.getEvents();
+      const topicLower = text.toLowerCase();
+      const related = events.filter(e =>
+        (e.original_text?.toLowerCase().includes(topicLower)) ||
+        (e.standard_concept?.toLowerCase().includes(topicLower)) ||
+        (e.structured?.what?.toLowerCase().includes(topicLower))
+      );
+      const selected = related.length ? related : events.slice(0, 5);
+      const draftId = uuid();
+      renderVisitDraftCard(bubble, text, selected, draftId,
+        () => confirmVisitBrief(text, selected),
+        () => { visitPrepState = null; const { content: c } = createBotBubble(); c.textContent = '好的，已取消。'; }
+      );
+      visitPrepState = { draftId, topic: text, events: selected };
+    }
+
+    const speakBtn = addSpeakButton(bubble, displayText, speak, stopSpeaking);
+    conversationHistory.push({ role: 'assistant', content: displayText });
+
+    if (autoTts && displayText) {
+      speakBtn.classList.add('speaking');
+      const u = speak(displayText); u.onend = () => speakBtn.classList.remove('speaking');
+    }
+  } catch (err) {
+    typingEl.classList.remove('active');
+    const { bubble, content } = createBotBubble();
+    content.textContent = `Error: ${err.message}`;
+    addTimeStamp(bubble);
+  } finally {
+    isStreaming = false;
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+}

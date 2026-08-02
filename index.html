@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HK Health Chat</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="chat-container">
+  <div class="chat-header">
+    <div class="avatar">&#x1F3E5;</div>
+    <div class="info">
+      <h2>HK Health Assistant</h2>
+      <p id="modelDisp">hkgai-v3</p>
+    </div>
+    <div class="header-actions">
+      <button onclick="togglePanel('records')" title="Health Records">&#x1F4CB;</button>
+      <button onclick="togglePanel('settings')" title="Settings">&#x2699;</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="panel" id="settingsPanel">
+    <div class="panel-header">
+      <h3>Settings</h3>
+      <button class="close-btn" onclick="togglePanel('settings')">&times;</button>
+    </div>
+    <div class="panel-body">
+      <label>System Prompt (additional)</label>
+      <textarea class="sys-prompt" id="sysPromptExtra" placeholder="Additional instructions..."></textarea>
+      <label>Temperature (0-2)</label>
+      <input type="text" id="tempInput" value="0.7">
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--input-border)">
+        <label style="font-size:13px;font-weight:600;margin-bottom:6px">Voice</label>
+        <div class="toggle-row">
+          <span>Auto-read replies</span>
+          <button class="toggle" id="autoTtsToggle" onclick="toggleAutoTts()"></button>
+        </div>
+        <label>TTS Voice</label>
+        <select id="voiceSelect"></select>
+        <label>Speech Recognition Language</label>
+        <select id="speechLang">
+          <option value="zh-HK">Cantonese (zh-HK)</option>
+          <option value="zh-TW">Traditional Chinese (zh-TW)</option>
+          <option value="zh-CN">Mandarin (zh-CN)</option>
+          <option value="en-US">English (en-US)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Health Records -->
+  <div class="panel" id="recordsPanel">
+    <div class="panel-header">
+      <h3>Health Records</h3>
+      <button class="close-btn" onclick="togglePanel('records')">&times;</button>
+    </div>
+    <div class="panel-body" id="recordsList"></div>
+    <div class="panel-footer">
+      <button onclick="startVisitPrep()">&#x1F4CB; Generate Visit Brief</button>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div class="messages" id="messages">
+    <div class="welcome">Say anything — I'll understand if it's a symptom, a question, or visit preparation.</div>
+  </div>
+  <div class="typing-indicator" id="typing"><span></span><span></span><span></span></div>
+  <div class="recording-status" id="recordingStatus"><div class="rec-dot"></div><span>Listening...</span></div>
+
+  <div class="input-area">
+    <button class="action-btn" id="micBtn" onclick="toggleMicBtn()" title="Voice input">&#x1F3A4;</button>
+    <textarea id="userInput" rows="1" placeholder="Type or speak..." autofocus></textarea>
+    <button class="action-btn" id="sendBtn" onclick="sendMessage()">&#x27A4;</button>
+  </div>
+</div>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
