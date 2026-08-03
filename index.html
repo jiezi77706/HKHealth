@@ -3,112 +3,356 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HK Health Chat</title>
+  <title>HKHealth — 港健康助手</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/landing.css">
 </head>
 <body>
 
-<div class="chat-container">
-  <div class="chat-header">
-    <div class="avatar">&#x1F3E5;</div>
-    <div class="info">
-      <h2>HK Health Assistant</h2>
-      <p id="modelDisp">hkgai-v3</p>
-    </div>
-    <div class="header-actions">
-      <button onclick="togglePanel('records')" title="Health Records">&#x1F4CB;</button>
-      <button onclick="togglePanel('settings')" title="Settings">&#x2699;</button>
-    </div>
-  </div>
+<!-- ═══════ Landing Page ═══════ -->
+<div id="landingPage" class="landing">
 
-  <!-- Settings -->
-  <div class="panel" id="settingsPanel">
-    <div class="panel-header">
-      <h3>Settings</h3>
-      <button class="close-btn" onclick="togglePanel('settings')">&times;</button>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-badge">港話通 · 粤语健康 Agent</div>
+      <h1 class="hero-title">
+        <span class="hero-accent">HK</span>Health
+      </h1>
+      <p class="hero-tagline">一句话说清现状，下一步直接行动。</p>
+      <p class="hero-sub">持续记住身体变化，并在需要时连接复诊、购药与更多香港本地服务。</p>
+      <button class="cta-btn" onclick="enterChat()">
+        <span class="cta-icon">💬</span>
+        开始对话
+      </button>
+      <div class="hero-stats">
+        <div class="stat"><span class="stat-num">14,241</span><span class="stat-label">注册药品</span></div>
+        <div class="stat"><span class="stat-num">494</span><span class="stat-label">持牌药房</span></div>
+        <div class="stat"><span class="stat-num">3</span><span class="stat-label">语言支持</span></div>
+      </div>
     </div>
-    <div class="panel-body">
-      <label>System Prompt (additional)</label>
-      <textarea class="sys-prompt" id="sysPromptExtra" placeholder="Additional instructions..."></textarea>
-      <label>Temperature (0-2)</label>
-      <input type="text" id="tempInput" value="0.7">
-      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--input-border)">
-        <label style="font-size:13px;font-weight:600;margin-bottom:6px">Voice</label>
-        <div class="toggle-row">
-          <span>Auto-read replies</span>
-          <button class="toggle" id="autoTtsToggle" onclick="toggleAutoTts()"></button>
+  </section>
+
+  <!-- Problem -->
+  <section class="section">
+    <div class="section-inner">
+      <h2 class="section-title">两次复诊之间，健康管理仍然依赖记忆</h2>
+      <p class="section-sub">身体变化难以持续记录；购药过程分散在多个步骤中。</p>
+      <div class="problem-grid">
+        <div class="problem-card">
+          <div class="problem-icon">📝</div>
+          <h3>健康记录难</h3>
+          <p>什么时候开始？后来怎样变化？到了复诊，才发现很难准确说清楚。</p>
         </div>
-        <label>TTS Voice</label>
-        <select id="voiceSelect"></select>
-        <label>Speech Recognition Language</label>
-        <select id="speechLang">
-          <option value="zh-HK">Cantonese (zh-HK)</option>
-          <option value="zh-TW">Traditional Chinese (zh-TW)</option>
-          <option value="zh-CN">Mandarin (zh-CN)</option>
-          <option value="en-US">English (en-US)</option>
-        </select>
+        <div class="problem-card">
+          <div class="problem-icon">💊</div>
+          <h3>购药流程繁琐</h3>
+          <p>药品核验 → 持牌药房 → 电话确认 → 路线规划，每一步都需要重新搜索。</p>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Health Records -->
-  <div class="panel" id="recordsPanel">
-    <div class="panel-header">
-      <h3>Health Records</h3>
-      <button class="close-btn" onclick="togglePanel('records')">&times;</button>
-    </div>
-    <div class="panel-body" id="recordsList"></div>
-    <div class="panel-footer">
-      <button onclick="startVisitPrep()">&#x1F4CB; Generate Visit Brief</button>
-    </div>
-  </div>
-
-  <!-- Chat -->
-  <div class="messages" id="messages">
-    <div class="welcome">
-      <div class="welcome-greeting">哈囉，想傾下今日身體點呀？</div>
-      <div class="welcome-prompts">
-        <button class="prompt-chip" data-msg="今日邊度唔舒服呀？">
-          <span class="prompt-label">咩事呀</span>
-          <span class="prompt-text">今日邊度唔舒服呀？</span>
-        </button>
-        <button class="prompt-chip" data-msg="係突然出現定慢慢嚟㗎？">
-          <span class="prompt-label">幾時開始</span>
-          <span class="prompt-text">係突然嚟定慢慢出現？</span>
-        </button>
-        <button class="prompt-chip" data-msg="可唔可以形容下係咩感覺？">
-          <span class="prompt-label">咩感覺</span>
-          <span class="prompt-text">可唔可以形容下？</span>
-        </button>
-        <button class="prompt-chip" data-msg="有冇影響到瞓覺、返工或者食嘢？">
-          <span class="prompt-label">影響咗咩</span>
-          <span class="prompt-text">瞓覺、返工、食嘢有冇影響？</span>
-        </button>
-        <button class="prompt-chip" data-msg="最近有冇捱夜、飲食變化、壓力大或者其他變化？">
-          <span class="prompt-label">可能關咩事</span>
-          <span class="prompt-text">捱夜、飲食變化、壓力大？</span>
-        </button>
-        <button class="prompt-chip" data-msg="自己做咗啲咩？有冇好轉？">
-          <span class="prompt-label">之後點</span>
-          <span class="prompt-text">做咗啲咩？有冇好轉？</span>
-        </button>
-      </div>
-      <div class="welcome-actions">
-        <button class="action-chip" data-msg="我想查下藥品信息">&#x1F48A; 查藥品藥房</button>
-        <button class="action-chip" onclick="togglePanel('records')">&#x1F4CB; 身體記錄</button>
-        <button class="action-chip" data-msg="我想準備覆診資料">&#x1F5C2; 問診摘要</button>
+  <!-- Solution -->
+  <section class="section section-alt">
+    <div class="section-inner">
+      <h2 class="section-title">HKHealth 让这两件事变得简单</h2>
+      <p class="section-sub">先接住用户说出的信息，再把它连接到可以直接使用的结果。</p>
+      <div class="path-grid">
+        <div class="path-card">
+          <div class="path-header">
+            <span class="path-emoji">🩺</span>
+            <h3>记住健康大小事</h3>
+          </div>
+          <div class="path-steps">
+            <span class="step-tag">自然口述</span>
+            <span class="step-arrow">→</span>
+            <span class="step-tag">必要追问</span>
+            <span class="step-arrow">→</span>
+            <span class="step-tag">长期记录</span>
+            <span class="step-arrow">→</span>
+            <span class="step-tag">复诊资料</span>
+          </div>
+          <p class="path-desc">随时说出来，需要时再调用。</p>
+        </div>
+        <div class="path-card">
+          <div class="path-header">
+            <span class="path-emoji">🏥</span>
+            <h3>完成找药与路线</h3>
+          </div>
+          <div class="path-steps">
+            <span class="step-tag">药品名称</span>
+            <span class="step-arrow">→</span>
+            <span class="step-tag">注册核验</span>
+            <span class="step-arrow">→</span>
+            <span class="step-tag">持牌药房</span>
+            <span class="step-arrow">→</span>
+            <span class="step-tag">电话与路线</span>
+          </div>
+          <p class="path-desc">一句话开始，直接走到药房。</p>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="typing-indicator" id="typing"><span></span><span></span><span></span></div>
+  </section>
 
-  <div class="input-area">
-    <button class="action-btn" id="micBtn" onclick="toggleMicBtn()" title="Voice input">&#x1F3A4;</button>
-    <textarea id="userInput" rows="1" placeholder="Type or speak..." autofocus></textarea>
-    <button class="action-btn" id="sendBtn" onclick="sendMessage()">&#x27A4;</button>
+  <!-- How it works -->
+  <section class="section">
+    <div class="section-inner">
+      <h2 class="section-title">一个入口，三条任务路径</h2>
+      <p class="section-sub">用户只负责说出需要，Agent 负责判断应进入哪条流程。</p>
+      <div class="demo-inputs">
+        <span class="demo-chip">"呢排成日头晕"</span>
+        <span class="demo-chip">"想查必理痛"</span>
+        <span class="demo-chip">"准备复诊资料"</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">❤️</div>
+          <h4>健康记录</h4>
+          <p>识别记录价值，必要时追问，写入长期健康事件</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💊</div>
+          <h4>药品与药房</h4>
+          <p>检索注册药品，展示销售类别，返回持牌药房与路线</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📋</div>
+          <h4>复诊准备</h4>
+          <p>询问就诊主题，检索相关记录，确认后生成摘要</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Human-AI boundary -->
+  <section class="section section-alt">
+    <div class="section-inner">
+      <h2 class="section-title">人和 AI 的边界在哪里</h2>
+      <p class="section-sub">AI 负责理解和推进信息；用户与医生保留医疗判断和最终决定。</p>
+      <div class="boundary-grid">
+        <div class="boundary-card boundary-human">
+          <h4>用户与医生</h4>
+          <p class="boundary-role">掌握真实信息与最终决定</p>
+          <ul>
+            <li>说出真实感受与需求</li>
+            <li>核对记录和正式输出</li>
+            <li>决定是否就医及如何治疗</li>
+          </ul>
+        </div>
+        <div class="boundary-card boundary-ai">
+          <h4>AI Agent</h4>
+          <p class="boundary-role">处理信息并提供行动入口</p>
+          <ul>
+            <li>理解表达并进行必要追问</li>
+            <li>形成记忆、整理并检索信息</li>
+            <li>调用本地工具并给出提示</li>
+          </ul>
+        </div>
+      </div>
+      <p class="boundary-note">AI 的工作止于理解、整理、检索与提示；诊断、治疗和最终决定由用户与医生掌握。</p>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="section">
+    <div class="section-inner">
+      <h2 class="section-title">让一句话成为可长期调用的结构</h2>
+      <p class="section-sub">对话保持自然，系统内部完成路由、状态管理、本地检索与可信输出。</p>
+      <div class="arch-flow">
+        <div class="arch-node">
+          <div class="arch-label">INPUT</div>
+          <div class="arch-items">粤语 / 文字<br>身体感受<br>药品名称</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-node">
+          <div class="arch-label">ROUTER</div>
+          <div class="arch-items">意图路由<br>健康记录<br>药品查询</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-node">
+          <div class="arch-label">MEMORY</div>
+          <div class="arch-items">结构化记忆<br>原始表达<br>事件字段</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-node">
+          <div class="arch-label">TOOLS</div>
+          <div class="arch-items">药品索引<br>药房索引<br>路线入口</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-node">
+          <div class="arch-label">OUTPUT</div>
+          <div class="arch-items">可见结果<br>用户确认<br>边界提示</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Data -->
+  <section class="section section-alt">
+    <div class="section-inner">
+      <h2 class="section-title">本地数据，让回答可以在香港执行</h2>
+      <div class="data-grid">
+        <div class="data-card">
+          <div class="data-num">01</div>
+          <h4>可核验</h4>
+          <p>药品身份与药房资格来自香港公开注册资料</p>
+        </div>
+        <div class="data-card">
+          <div class="data-num">02</div>
+          <h4>可追溯</h4>
+          <p>保留注册编号、销售类别、地址与电话等关键字段</p>
+        </div>
+        <div class="data-card">
+          <div class="data-num">03</div>
+          <h4>可行动</h4>
+          <p>把核验结果连接到致电确认与路线入口</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section cta-section">
+    <div class="section-inner" style="text-align:center">
+      <h2 class="section-title" style="color:#fff">让每一次身体表达，<br>成为下一次需要时可用的信息</h2>
+      <div class="cta-tags">
+        <span>说得出 — 日常粤语与自然输入</span>
+        <span>记得住 — 长期健康记忆</span>
+        <span>做得到 — 药房行动与复诊资料</span>
+      </div>
+      <button class="cta-btn cta-btn-light" onclick="enterChat()">
+        <span class="cta-icon">💬</span>
+        立即体验
+      </button>
+    </div>
+  </section>
+
+  <footer class="landing-footer">
+    <p>HKHealth · 港话通粤语健康 Agent</p>
+  </footer>
+</div>
+
+<!-- ═══════ Chat App (hidden initially) ═══════ -->
+<div id="chatApp" class="chat-app-wrapper" style="display:none">
+  <div class="chat-container">
+    <div class="chat-header">
+      <button class="back-btn" onclick="exitChat()" title="Back to intro">←</button>
+      <div class="avatar">&#x1F3E5;</div>
+      <div class="info">
+        <h2>HK Health Assistant</h2>
+        <p id="modelDisp">hkgai-v3</p>
+      </div>
+      <div class="header-actions">
+        <button onclick="togglePanel('records')" title="Health Records">&#x1F4CB;</button>
+        <button onclick="togglePanel('settings')" title="Settings">&#x2699;</button>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="panel" id="settingsPanel">
+      <div class="panel-header">
+        <h3>Settings</h3>
+        <button class="close-btn" onclick="togglePanel('settings')">&times;</button>
+      </div>
+      <div class="panel-body">
+        <label>System Prompt (additional)</label>
+        <textarea class="sys-prompt" id="sysPromptExtra" placeholder="Additional instructions..."></textarea>
+        <label>Temperature (0-2)</label>
+        <input type="text" id="tempInput" value="0.7">
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--input-border)">
+          <label style="font-size:13px;font-weight:600;margin-bottom:6px">Voice</label>
+          <div class="toggle-row">
+            <span>Auto-read replies</span>
+            <button class="toggle" id="autoTtsToggle" onclick="toggleAutoTts()"></button>
+          </div>
+          <label>TTS Voice</label>
+          <select id="voiceSelect"></select>
+          <label>Speech Recognition Language</label>
+          <select id="speechLang">
+            <option value="zh-HK">Cantonese (zh-HK)</option>
+            <option value="zh-TW">Traditional Chinese (zh-TW)</option>
+            <option value="zh-CN">Mandarin (zh-CN)</option>
+            <option value="en-US">English (en-US)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Health Records -->
+    <div class="panel" id="recordsPanel">
+      <div class="panel-header">
+        <h3>Health Records</h3>
+        <button class="close-btn" onclick="togglePanel('records')">&times;</button>
+      </div>
+      <div class="panel-body" id="recordsList"></div>
+      <div class="panel-footer">
+        <button onclick="startVisitPrep()">&#x1F4CB; Generate Visit Brief</button>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div class="messages" id="messages">
+      <div class="welcome">
+        <div class="welcome-greeting">哈囉，想傾下今日身體點呀？</div>
+        <div class="welcome-prompts">
+          <button class="prompt-chip" data-msg="今日邊度唔舒服呀？">
+            <span class="prompt-label">咩事呀</span>
+            <span class="prompt-text">今日邊度唔舒服呀？</span>
+          </button>
+          <button class="prompt-chip" data-msg="係突然出現定慢慢嚟㗎？">
+            <span class="prompt-label">幾時開始</span>
+            <span class="prompt-text">係突然嚟定慢慢出現？</span>
+          </button>
+          <button class="prompt-chip" data-msg="可唔可以形容下係咩感覺？">
+            <span class="prompt-label">咩感覺</span>
+            <span class="prompt-text">可唔可以形容下？</span>
+          </button>
+          <button class="prompt-chip" data-msg="有冇影響到瞓覺、返工或者食嘢？">
+            <span class="prompt-label">影響咗咩</span>
+            <span class="prompt-text">瞓覺、返工、食嘢有冇影響？</span>
+          </button>
+          <button class="prompt-chip" data-msg="最近有冇捱夜、飲食變化、壓力大或者其他變化？">
+            <span class="prompt-label">可能關咩事</span>
+            <span class="prompt-text">捱夜、飲食變化、壓力大？</span>
+          </button>
+          <button class="prompt-chip" data-msg="自己做咗啲咩？有冇好轉？">
+            <span class="prompt-label">之後點</span>
+            <span class="prompt-text">做咗啲咩？有冇好轉？</span>
+          </button>
+        </div>
+        <div class="welcome-actions">
+          <button class="action-chip" data-msg="我想查下藥品信息">&#x1F48A; 查藥品藥房</button>
+          <button class="action-chip" onclick="togglePanel('records')">&#x1F4CB; 身體記錄</button>
+          <button class="action-chip" data-msg="我想準備覆診資料">&#x1F5C2; 問診摘要</button>
+        </div>
+      </div>
+    </div>
+    <div class="typing-indicator" id="typing"><span></span><span></span><span></span></div>
+
+    <div class="input-area">
+      <button class="action-btn" id="micBtn" onclick="toggleMicBtn()" title="Voice input">&#x1F3A4;</button>
+      <textarea id="userInput" rows="1" placeholder="Type or speak..."></textarea>
+      <button class="action-btn" id="sendBtn" onclick="sendMessage()">&#x27A4;</button>
+    </div>
   </div>
 </div>
 
+<script>
+document.body.classList.add('landing-mode');
+function enterChat() {
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('chatApp').style.display = 'flex';
+  document.body.classList.remove('landing-mode');
+  document.getElementById('userInput')?.focus();
+}
+function exitChat() {
+  document.getElementById('chatApp').style.display = 'none';
+  document.getElementById('landingPage').style.display = 'block';
+  document.body.classList.add('landing-mode');
+  window.scrollTo(0, 0);
+}
+</script>
 <script type="module" src="/js/app.js"></script>
 </body>
 </html>
